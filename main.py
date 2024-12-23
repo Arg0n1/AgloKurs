@@ -2,147 +2,131 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-def direct_search(text, pattern):
-    n = len(text)
-    m = len(pattern)
-
+def direct_search(string, substring):
+    n = len(string)
+    m = len(substring)
+    result = []
     for i in range(n - m + 1):
-        if text[i:i + m] == pattern:
-            return i
-    return -1
+        if string[i:i + m] == substring:
+            result.append(i)
+    return result if result else -1
 
-def direct_search_time(text, pattern, length):
-    truncated_text = text[:length]
+def direct_search_time(string, substring, length):
+    truncated_text = string[:length]
     start = time.time()
-    direct_search(truncated_text,pattern)
+    direct_search(truncated_text, substring)
     end = time.time()
     return end - start
 
-def pi_func_create(pattern):
-    m = len(pattern)
+def pi_func_create(substring):
+    m = len(substring)
     pi_func = [0] * m
-    j = 0
     for i in range(1, m):
-        while j > 0 and pattern[i] != pattern[j]:
+        j = pi_func[i - 1]
+        while j > 0 and substring[i] != substring[j]:
             j = pi_func[j - 1]
-        if pattern[i] == pattern[j]:
+        if substring[i] == substring[j]:
             j += 1
         pi_func[i] = j
     return pi_func
 
-def kmp_search(text, pattern):
-    n = len(text)
-    m = len(pattern)
-    pi_func = pi_func_create(pattern)
+def kmp_search(string, substring):
+    pi_func = pi_func_create(substring)
     j = 0
-    for i in range(n):
-        while j > 0 and text[i] != pattern[j]:
+    result = []
+    for i in range(0, len(string)):
+        while j > 0 and string[i] != substring[j]:
             j = pi_func[j - 1]
-        if text[i] == pattern[j]:
+        if string[i] == substring[j]:
             j += 1
-        if j == m:
-            return i - m + 1
-    return -1
+        if j == len(substring):
+            result.append(i - j + 1)
+            j = pi_func[j - 1]
+    return result if result else -1
 
-def kmp_time(text, pattern, length):
-    truncated_text = text[:length]
+def kmp_time(string, substring, length):
+    truncated_text = string[:length]
     start = time.time()
-    kmp_search(truncated_text, pattern)
+    kmp_search(truncated_text, substring)
     end = time.time()
     return end - start
 
+def offset_table(substring, start_index, end_index):
+    alphabet_size = end_index - start_index + 1
+    alphabet_table = [len(substring)] * alphabet_size
+    for i in range(len(substring) - 1):
+        char_index = ord(substring[i]) - start_index
+        if 0 <= char_index < alphabet_size:
+            alphabet_table[char_index] = len(substring) - i - 1
+    return alphabet_table
 
-def offset_table(pattern):
-    m = len(pattern)
-    S = set()
-    dictionary = {}
-    for i in range(m-2, -1, -1):
-        if pattern[i] not in S:
-            dictionary[pattern[i]] = m - i - 1
-            S.add(pattern[i])
-
-    if pattern[m-1] not in S:
-        dictionary[pattern[m-1]] = m
-
-    dictionary['*'] = m
-
-    return dictionary
-
-def bmh_search(text, pattern):
-    n = len(text)
-    m = len(pattern)
-    dictionary = offset_table(pattern)
-    if n >= m:
-        i = m - 1
-
-        while i < n:
-            k = 0
-            for j in range(m-1, -1, -1):
-                if text[i - k] != pattern[j]:
-                    if j == m - 1:
-                        off = dictionary[text[i]] if dictionary.get(text[i], False) else dictionary['*']
-                    else:
-                        off = dictionary[pattern[j]]
-
-                    i += off
-                    break
-                k += 1
-            if j == 0:
-                return i-k+1
-        else:
-            return -1
-    else:
+def bmh_search(string, substring):
+    if len(substring) > len(string):
         return -1
+    start_index = ord(" ")
+    end_index = ord("~")
+    alphabet_table = offset_table(substring, start_index, end_index)
+    i = len(substring) - 1
+    result = []
+    while i < len(string):
+        if string[i - len(substring) + 1:i + 1] == substring:
+            result.append(i - len(substring) + 1)
+            i += 1
+            continue
+        char_index = ord(string[i]) - start_index
+        shift = alphabet_table[char_index] if 0 <= char_index < len(alphabet_table) else len(substring)
+        i += shift
+    return result if result else -1
 
-def bmh_time(text, pattern, length):
-    truncated_text = text[:length]
+def bmh_time(string, substring, length):
+    truncated_text = string[:length]
     start = time.time()
-    bmh_search(truncated_text, pattern)
+    bmh_search(truncated_text, substring)
     end = time.time()
     return end - start
 
 def gorner_scheme(text):
     result = 0
-    base = 31
+    base = 52
     for i in text:
         result = result * base + ord(i)
     return result
 
-def calculate_hash(text):
-        q = 2147483647
-        return gorner_scheme(text) % q
+def calculate_hash(string):
+        q = 65713
+        return gorner_scheme(string) % q
 
-def rk_search(text, pattern):
-    base = 31
-    q = 2147483647
-    m = len(pattern)
-    n = len(text)
+def rk_search(string, substring):
+    base = 52
+    q = 65713
+    m = len(substring)
+    n = len(string)
     if m > n:
         return -1
-    pattern_hash = calculate_hash(pattern)
-    text_hash = calculate_hash(text[:m])
-    high_order = pow(base, m - 1, q)
+    pattern_hash = calculate_hash(substring)
+    text_hash = calculate_hash(string[:m])
+    result = []
     for i in range(n - m + 1):
         if text_hash == pattern_hash:
-            if text[i:i + m] == pattern:
-                return i
+            if string[i:i + m] == substring:
+                result.append(i)
         if i + m < n:
-            text_hash = (text_hash - ord(text[i]) * high_order) * base + ord(text[i + m])
-            text_hash %= q
-    return -1
+            text_hash = ((text_hash - ord(string[i]) * base ** (m - 1)) * base + ord(string[i + m])) % q
+            text_hash = (text_hash + q) % q
+    return result if result else -1
 
-def rk_time(text, pattern,length):
-    truncated_text = text[:length]
+def rk_time(string, substring, length):
+    truncated_text = string[:length]
     start = time.time()
-    rk_search(truncated_text, pattern)
+    rk_search(truncated_text, substring)
     end = time.time()
     return end - start
 
-file_path = "Alice.txt"
+file_path = "DNA.txt"
 with open(file_path, "r") as file:
     text = file.read()
 
-pattern = "Alice said nothing; she had sat down with her face in her"
+pattern = "ACTG"
 
 search = {
     "Прямой поиск": direct_search_time,
@@ -156,7 +140,7 @@ for alg_name, alg_code in search.items():
     print(f"Запуск алгоритма: {alg_name}")
     lengths = []
     times = []
-    for length in range(300, 20001, 200):
+    for length in range(300, 150000, 1000):
         execution_time = alg_code(text, pattern, length)
         lengths.append(length)
         times.append(execution_time)
@@ -198,3 +182,4 @@ print(direct_search(text, pattern))
 print(kmp_search(text, pattern))
 print(bmh_search(text, pattern))
 print(rk_search(text, pattern))
+print(offset_table(pattern, start_index=ord(" "), end_index=ord("~")))
