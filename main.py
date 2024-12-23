@@ -18,147 +18,123 @@ def direct_search_time(text, pattern, length):
     end = time.time()
     return end - start
 
-def rabin_karp(text, pattern, d, q):
-    n = len(text)
+def pi_func_create(pattern):
     m = len(pattern)
-    if m > n:
-        return -1
-
-    pattern_hash = 0
-    text_hash = 0
-    h = 1
-
-    for i in range(m - 1):
-        h = (h * d) % q
-
-    for i in range(m):
-        pattern_hash = (d * pattern_hash + ord(pattern[i])) % q
-        text_hash = (d * text_hash + ord(text[i])) % q
-
-    for i in range(n - m + 1):
-        if pattern_hash == text_hash:
-            if text[i:i + m] == pattern:
-                return i
-
-        if i < n - m:
-            text_hash = (d * (text_hash - ord(text[i]) * h) + ord(text[i + m])) % q
-            if text_hash < 0:
-                text_hash += q
-
-    return -1
-
-def rabin_karp_time(text, pattern,length, d=256, q=101):
-    truncated_text = text[:length]
-    start = time.time()
-    rabin_karp(truncated_text, pattern, d=d, q=q)
-    end = time.time()
-    return end - start
-
-def boyer_moore(text, pattern):
-    def build_bad_char_table(pattern):
-        table = {}
-        m = len(pattern)
-        for i in range(m):
-            table[pattern[i]] = m - i - 1
-        return table
-
-    def build_good_suffix_table(pattern):
-        m = len(pattern)
-        good_suffix = [m] * (m + 1)
-        border_position = [0] * (m + 1)
-
-        i = m
-        j = m + 1
-        border_position[i] = j
-        while i > 0:
-            while j <= m and pattern[i - 1] != pattern[j - 1]:
-                if good_suffix[j] == m:
-                    good_suffix[j] = j - i
-                j = border_position[j]
-            i -= 1
-            j -= 1
-            border_position[i] = j
-
-        j = border_position[0]
-        for i in range(m + 1):
-            if good_suffix[i] == m:
-                good_suffix[i] = j
-            if i == j:
-                j = border_position[j]
-        return good_suffix
-
-    m = len(pattern)
-    n = len(text)
-    bad_char_table = build_bad_char_table(pattern)
-    good_suffix_table = build_good_suffix_table(pattern)
-
-    i = 0
-    while i <= n - m:
-        j = m - 1
-        while j >= 0 and text[i + j] == pattern[j]:
-            j -= 1
-        if j == -1:
-            return i
-        else:
-            bad_char_shift = bad_char_table.get(text[i + j], m)
-            good_suffix_shift = good_suffix_table[j + 1]
-            shift = max(bad_char_shift, good_suffix_shift)
-            i += shift
-    return -1
-
-def boyer_moore_time(text, pattern, length):
-    truncated_text = text[:length]
-    start = time.time()
-    boyer_moore(truncated_text, pattern)
-    end = time.time()
-    return end - start
+    pi_func = [0] * m
+    j = 0
+    for i in range(1, m):
+        while j > 0 and pattern[i] != pattern[j]:
+            j = pi_func[j - 1]
+        if pattern[i] == pattern[j]:
+            j += 1
+        pi_func[i] = j
+    return pi_func
 
 def kmp_search(text, pattern):
-    def compute_lps(pattern):
-        m = len(pattern)
-        lps = [0] * m
-        length = 0
-        i = 1
-
-        while i < m:
-            if pattern[i] == pattern[length]:
-                length += 1
-                lps[i] = length
-                i += 1
-            else:
-                if length != 0:
-                    length = lps[length - 1]
-                else:
-                    lps[i] = 0
-                    i += 1
-        return lps
-
     n = len(text)
     m = len(pattern)
-    lps = compute_lps(pattern)
-    i = 0
+    pi_func = pi_func_create(pattern)
     j = 0
-
-    while i < n:
-        if pattern[j] == text[i]:
-            i += 1
+    for i in range(n):
+        while j > 0 and text[i] != pattern[j]:
+            j = pi_func[j - 1]
+        if text[i] == pattern[j]:
             j += 1
-
         if j == m:
-            return i - j
-        elif i < n and pattern[j] != text[i]:
-            if j != 0:
-                j = lps[j - 1]
-            else:
-                i += 1
-
+            return i - m + 1
     return -1
 
-
-def kmp_search_time(text, pattern, length):
+def kmp_time(text, pattern, length):
     truncated_text = text[:length]
     start = time.time()
     kmp_search(truncated_text, pattern)
+    end = time.time()
+    return end - start
+
+
+def offset_table(pattern):
+    m = len(pattern)
+    S = set()
+    dictionary = {}
+    for i in range(m-2, -1, -1):
+        if pattern[i] not in S:
+            dictionary[pattern[i]] = m - i - 1
+            S.add(pattern[i])
+
+    if pattern[m-1] not in S:
+        dictionary[pattern[m-1]] = m
+
+    dictionary['*'] = m
+
+    return dictionary
+
+def bmh_search(text, pattern):
+    n = len(text)
+    m = len(pattern)
+    dictionary = offset_table(pattern)
+    if n >= m:
+        i = m - 1
+
+        while i < n:
+            k = 0
+            for j in range(m-1, -1, -1):
+                if text[i - k] != pattern[j]:
+                    if j == m - 1:
+                        off = dictionary[text[i]] if dictionary.get(text[i], False) else dictionary['*']
+                    else:
+                        off = dictionary[pattern[j]]
+
+                    i += off
+                    break
+                k += 1
+            if j == 0:
+                return i-k+1
+        else:
+            return -1
+    else:
+        return -1
+
+def bmh_time(text, pattern, length):
+    truncated_text = text[:length]
+    start = time.time()
+    bmh_search(truncated_text, pattern)
+    end = time.time()
+    return end - start
+
+def gorner_scheme(text):
+    result = 0
+    base = 31
+    for i in text:
+        result = result * base + ord(i)
+    return result
+
+def calculate_hash(text):
+        q = 2147483647
+        return gorner_scheme(text) % q
+
+def rk_search(text, pattern):
+    base = 31
+    q = 2147483647
+    m = len(pattern)
+    n = len(text)
+    if m > n:
+        return -1
+    pattern_hash = calculate_hash(pattern)
+    text_hash = calculate_hash(text[:m])
+    high_order = pow(base, m - 1, q)
+    for i in range(n - m + 1):
+        if text_hash == pattern_hash:
+            if text[i:i + m] == pattern:
+                return i
+        if i + m < n:
+            text_hash = (text_hash - ord(text[i]) * high_order) * base + ord(text[i + m])
+            text_hash %= q
+    return -1
+
+def rk_time(text, pattern,length):
+    truncated_text = text[:length]
+    start = time.time()
+    rk_search(truncated_text, pattern)
     end = time.time()
     return end - start
 
@@ -166,13 +142,13 @@ file_path = "Alice.txt"
 with open(file_path, "r") as file:
     text = file.read()
 
-pattern = "Ultimately this exercise challenges us to strike a balance between brevity and detail pushing us to create a thoughtful and polished text that is not only the required length but also impactful cohesive and carefully crafted from start to finish"
+pattern = "Alice said nothing; she had sat down with her face in her"
 
 search = {
     "Прямой поиск": direct_search_time,
-    "Рабин-Карп": rabin_karp_time,
-    "Бойер-Мур": boyer_moore_time,
-    "Кнут-Моррис-Пратт": kmp_search_time
+    "Кнут-Моррис-Пратт": kmp_time,
+    "Бойер-Мур-Хорспул": bmh_time,
+    "Рабин-Карп": rk_time
 }
 all_results = {}
 
@@ -180,7 +156,7 @@ for alg_name, alg_code in search.items():
     print(f"Запуск алгоритма: {alg_name}")
     lengths = []
     times = []
-    for length in range(300, 1001, 2):
+    for length in range(300, 20001, 200):
         execution_time = alg_code(text, pattern, length)
         lengths.append(length)
         times.append(execution_time)
@@ -218,3 +194,7 @@ plt.subplots_adjust(bottom=0.3)
 plt.grid(True)
 plt.show()
 
+print(direct_search(text, pattern))
+print(kmp_search(text, pattern))
+print(bmh_search(text, pattern))
+print(rk_search(text, pattern))
